@@ -37,7 +37,7 @@ def find_track_matches(regex, track_list):
     for track in track_list:
         m = re.match(regex, track)
         if m:
-            tracks.append((int(m.group('id')), m.group('description')))
+            tracks.append((m.group('id'), m.group('description')))
     return tracks
 
 def filter_by(regexes, tracks):
@@ -49,25 +49,25 @@ def filter_by(regexes, tracks):
     return selected_tracks
 
 def chapter_tracks(track_list):
-    return find_track_matches(r'(?P<id>[0-9]+): (?P<description>Chapters, .*)',
+    return find_track_matches(r'(?P<id>[0-9]+:) (?P<description>Chapters, .*)',
                               track_list)
 
 def video_tracks(track_list):
-    return find_track_matches(r'(?P<id>[0-9]+): (?P<description>h264/AVC, 1080p24 /1.001 \(16:9\)$)', track_list)
+    return find_track_matches(r'(?P<id>[0-9]+:) (?P<description>h264/AVC, 1080p24 /1.001 \(16:9\)$)', track_list)
 
 def lossless_audio_tracks(track_list, languages=[r'English']):
-    all_tracks = find_track_matches(r'(?P<id>[0-9]+): (?P<description>DTS Master Audio, .*)',
+    all_tracks = find_track_matches(r'(?P<id>[0-9]+:) (?P<description>DTS Master Audio, .*)',
                                     track_list)
     return filter_by(languages, all_tracks)
 
 def lossy_audio_tracks(track_list, languages=[r'English'], channels=[r'2.0']):
-    all_tracks = find_track_matches(r'(?P<id>[0-9]+): (?P<description>AC3, .*)', track_list)
-    all_tracks += find_track_matches(r'(?P<id>[0-9]+): (?P<description>AC3 Surround, .*)', track_list)
-    all_tracks += find_track_matches(r'(?P<id>[0-9]+): (?P<description>DTS, .*)', track_list)
+    all_tracks = find_track_matches(r'(?P<id>[0-9]+:) (?P<description>AC3, .*)', track_list)
+    all_tracks += find_track_matches(r'(?P<id>[0-9]+:) (?P<description>AC3 Surround, .*)', track_list)
+    all_tracks += find_track_matches(r'(?P<id>[0-9]+:) (?P<description>DTS, .*)', track_list)
     return filter_by(channels, filter_by(languages, all_tracks))
                       
 def subtitle_tracks(track_list, languages=['English']):
-    all_tracks = find_track_matches(r'(?P<id>[0-9]+): (?P<description>Subtitle \(PGS\), .*)',
+    all_tracks = find_track_matches(r'(?P<id>[0-9]+:) (?P<description>Subtitle \(PGS\), .*)',
                                     track_list)
     return filter_by(languages, all_tracks)
 
@@ -178,7 +178,7 @@ def demux(path, user_playlist=None):
             logger.info("    none")
         else:
             for track in tracks:
-                logger.info("    %d: %s" % (track[0], track[1]))
+                logger.info("    %s %s" % (track[0], track[1]))
         return
     logger.info("Demuxing the following tracks:")
     log_tracks("Chapters", chapters)
@@ -197,13 +197,13 @@ def demux(path, user_playlist=None):
     prefix = 1
     eac3to_chapter_args = []
     for track in chapters:
-        eac3to_chapter_args.append('%d:' % track[0])
+        eac3to_chapter_args.append(track[0])
         eac3to_chapter_args.append('%02dchapters.txt' % prefix)
         prefix += 1
 
     eac3to_video_args = []
     for track in videos:
-        eac3to_video_args.append('%d:' % track[0])
+        eac3to_video_args.append(track[0])
         eac3to_video_args.append('%02dvideo.mkv' % prefix)
         prefix += 1
     # XXX video track 0 is always the default for now
@@ -219,7 +219,7 @@ def demux(path, user_playlist=None):
             logger.error("Track %d is a 6.1-channel track, aborting.", track[0])
             return 1
 
-        eac3to_soundtrack_args.append('%d:' % track[0])
+        eac3to_soundtrack_args.append(track[0])
         if re.match(r'\(FLAC\)', track[1]):
             eac3to_soundtrack_args.append('%02daudio.flac' % prefix)
 
@@ -236,7 +236,7 @@ def demux(path, user_playlist=None):
 
     eac3to_commentary_args = []
     for track in commentaries:
-        eac3to_commentary_args.append('%d:' % track[0])
+        eac3to_commentary_args.append(track[0])
         if re.match(r'AC3', track[1]):
             eac3to_commentary_args.append('%02dcommentary.ac3' % prefix)
         elif re.match(r'DTS', track[1]):
@@ -253,7 +253,7 @@ def demux(path, user_playlist=None):
 
     eac3to_subtitle_args = []
     for track in subtitles:
-        eac3to_subtitle_args.append('%d:' % track[0])
+        eac3to_subtitle_args.append(track[0])
         eac3to_subtitle_args.append('%02dsubtitles.sup' % prefix)
         prefix += 1
 
@@ -266,6 +266,7 @@ def demux(path, user_playlist=None):
 
     logger.info('')
     logger.info("Demuxing command line: %s", ' '.join(eac3to_command))
+    return 0
     return subprocess.call(eac3to_command)
     
 def main(argv=None):
