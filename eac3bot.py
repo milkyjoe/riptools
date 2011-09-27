@@ -190,25 +190,15 @@ def demux(path, user_playlist=None):
     logger.info('')
     
     #
-    # Map tracks to filenames for extraction. For easy sorting when
-    # loading tracks into mkvmerge, I prefix each track with a
-    # monotonically increasing integer that corresponds to its
-    # relative order in the final MKV file.
+    # Map tracks to filenames for extraction.
     #
-    prefix = 1
-    eac3to_chapter_args = []
+    def idnum(track):
+        return int(track['id'].rstrip(':'))
+
     for track in chapters:
-        eac3to_chapter_args.append(track['id'])
-        eac3to_chapter_args.append('%02dchapters.txt' % prefix)
-        prefix += 1
-
-    eac3to_video_args = []
+        track['filename'] = '%02dchapters.txt' % idnum(track)
     for track in videos:
-        eac3to_video_args.append(track['id'])
-        eac3to_video_args.append('%02dvideo.mkv' % prefix)
-        prefix += 1
-
-    eac3to_soundtrack_args = []
+        track['filename'] = '%02dvideo.mkv' % idnum(track)
     for track in soundtracks:
         # XXX handle these more gracefully.
         if re.search(r'strange setup', track['description']):
@@ -218,52 +208,41 @@ def demux(path, user_playlist=None):
             logger.error("Track %d is a 6.1-channel track, aborting.", track['id'])
             return 1
 
-        eac3to_soundtrack_args.append(track['id'])
         if re.match(r'\(FLAC\)', track['description']):
-            eac3to_soundtrack_args.append('%02daudio.flac' % prefix)
-
+            track['filename'] = '%02daudio.flac' % idnum(track)
         elif re.match(r'DTS', track['description']):
-            eac3to_soundtrack_args.append('%02daudio.dts' % prefix)
+            track['filename'] = '%02daudio.dts' % idnum(track)
         elif re.match(r'TrueHD', track['description']):
-            eac3to_soundtrack_args.append('%02daudio.thd' % prefix)
+            track['filename'] = '%02daudio.thd' % idnum(track)
         else:
             # It's a raw/PCM track, skip it.
             continue
-        prefix += 1
-
-    eac3to_commentary_args = []
     for track in commentaries:
-        eac3to_commentary_args.append(track['id'])
         if re.match(r'AC3', track['description']):
-            eac3to_commentary_args.append('%02dcommentary.ac3' % prefix)
+            track['filename'] = '%02dcommentary.ac3' % idnum(track)
         elif re.match(r'DTS', track['description']):
-            eac3to_commentary_args.append('%02dcommentary.dts' % prefix)
+            track['filename'] = '%02dcommentary.dts' % idnum(track)
         else:
             # XXX hack.
             logger.error("Unknown commentary track type: %s" % track['description'])
             return 1
-
         # Keep dialog normalization for commentaries.
         if re.search(r'dialnorm', track['description']):
-            eac3to_commentary_args.append('-keepDialnorm')
-        prefix += 1
-
-    eac3to_subtitle_args = []
+            track['eac3to args'] = ['-keepDialnorm']
     for track in subtitles:
-        eac3to_subtitle_args.append(track['id'])
-        eac3to_subtitle_args.append('%02dsubtitles.sup' % prefix)
-        prefix += 1
+        track['filename'] = '%02dsubtitles.sup' % idnum(track)
 
     eac3to_command = [eac3to, path, '%d)' % chosen_playlist]
-    eac3to_command += eac3to_chapter_args
-    eac3to_command += eac3to_video_args
-    eac3to_command += eac3to_soundtrack_args
-    eac3to_command += eac3to_commentary_args
-    eac3to_command += eac3to_subtitle_args
+    for lst in [chapters, videos, soundtracks, commentaries, subtitles]:
+        for track in lst:
+            eac3to_command.append(track['id'])
+            eac3to_command.append(track['filename'])
+            if 'eac3to args' in track:
+                # eac3to args are a list.
+                eac3to_command += track['eac3to args']
 
     logger.info('')
     logger.info("Demuxing command line: %s", ' '.join(eac3to_command))
-    return 0
     return subprocess.call(eac3to_command)
     
 def main(argv=None):
