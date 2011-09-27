@@ -207,8 +207,6 @@ def demux(path, user_playlist=None):
         eac3to_video_args.append(track['id'])
         eac3to_video_args.append('%02dvideo.mkv' % prefix)
         prefix += 1
-    # XXX video track 0 is always the default for now
-    logger.info("Default video track filename: %s" % eac3to_video_args[1])
 
     eac3to_soundtrack_args = []
     for track in soundtracks:
@@ -232,8 +230,6 @@ def demux(path, user_playlist=None):
             # It's a raw/PCM track, skip it.
             continue
         prefix += 1
-    # XXX soundtrack track 0 is always the default for now
-    logger.info("Default audio track filename: %s" % eac3to_soundtrack_args[1])
 
     eac3to_commentary_args = []
     for track in commentaries:
