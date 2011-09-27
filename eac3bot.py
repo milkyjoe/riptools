@@ -202,30 +202,38 @@ def demux(path, user_playlist=None):
     for track in soundtracks:
         # XXX handle these more gracefully.
         if re.search(r'strange setup', track['description']):
-            logger.error("Track %d is a 'strange setup', aborting.", track['id'])
+            logger.error("Track %d is a 'strange setup', aborting." % track['id'])
             return 1
         elif re.search(r'6.1 channels', track['description']):
-            logger.error("Track %d is a 6.1-channel track, aborting.", track['id'])
+            logger.error("Track %d is a 6.1-channel track, aborting." % track['id'])
             return 1
 
         if re.match(r'\(FLAC\)', track['description']):
             track['filename'] = '%02daudio.flac' % idnum(track)
-        elif re.match(r'DTS', track['description']):
+            track['format'] = 'FLAC'
+        elif re.match(r'DTS Master Audio', track['description']):
             track['filename'] = '%02daudio.dts' % idnum(track)
+            track['format'] = 'DTS-MA'
         elif re.match(r'TrueHD', track['description']):
             track['filename'] = '%02daudio.thd' % idnum(track)
+            track['format'] = 'TrueHD'
         else:
-            # It's a raw/PCM track, skip it.
-            continue
+            # XXX handle these more gracefully
+            logger.error("Audio track %d has an unknown type: %s" % (track['id'], track['description']))
+            return 1
+        track['channels'] = re.search(r'(?P<channels>[1-7]\.[0-2] channels)', track['description']).group('channels')
     for track in commentaries:
         if re.match(r'AC3', track['description']):
             track['filename'] = '%02dcommentary.ac3' % idnum(track)
+            track['format'] = 'AC3'
         elif re.match(r'DTS', track['description']):
             track['filename'] = '%02dcommentary.dts' % idnum(track)
+            track['format'] = 'DTS'
         else:
             # XXX hack.
-            logger.error("Unknown commentary track type: %s" % track['description'])
+            logger.error("Commentary track %s has unknown type: %s" % (track['id'], track['description']))
             return 1
+        track['channels'] = re.search(r'(?P<channels>[1-7]\.[0-2] channels)', track['description']).group('channels')
         # Keep dialog normalization for commentaries.
         if re.search(r'dialnorm', track['description']):
             track['eac3to args'] = ['-keepDialnorm']
@@ -243,7 +251,56 @@ def demux(path, user_playlist=None):
 
     logger.info('')
     logger.info("Demuxing command line: %s", ' '.join(eac3to_command))
-    return subprocess.call(eac3to_command)
+
+    rc = subprocess.call(eac3to_command)
+    if rc:
+        return rc
+
+    mkvmerge_options = ['# Set default language']
+    mkvmerge_options += ['--default-language', 'eng']
+    # eac3to always saves the log file as 'foo - Log.txt' where 'foo'
+    # is the filename of the first extracted track, minus the '.txt'
+    # extension. In our case, that's the chapter file.
+    mkvmerge_options += ['', '# Attach eac3to extraction log']
+    mkvmerge_options += ['--attachment-description', 'eac3to extraction log',
+                         '--attachment-mime-type', 'text/plain',
+                         '--attach-file', '%s - Log.txt' % chapters[0]['filename'].rstrip('.txt')]
+    mkvmerge_options += ['', '# Chapter file']
+    for track in chapters:
+        mkvmerge_options += ['--chapters', track['filename']]
+    # XXX hack - assume first video track is the default
+    mkvmerge_options += ['', '# Default video track']
+    mkvmerge_options += ['--default-track', '-1:1',
+                         '--track-name', '-1:Theatrical release',
+                         videos[0]['filename']]
+    mkvmerge_options += ['', '# Additional video tracks (may be empty)']
+    for track in videos[1:]:
+        mkvmerge_options += ['--default-track', '-1:0', track['filename']]
+    # XXX hack - assume first soundtrack is the default
+    mkvmerge_options += ['', '# Default audio track']
+    mkvmerge_options += ['--default-track', '-1:1',
+                         '--track-name', '-1:%s theatrical soundtrack (%s)' % (soundtracks[0]['format'], soundtracks[0]['channels']),
+                         soundtracks[0]['filename']]
+    mkvmerge_options += ['', '# Additional audio tracks (may be empty)']
+    for track in soundtracks[1:]:
+        mkvmerge_options += ['--default-track', '-1:0',
+                             '--track-name', '-1:%s theatrical soundtrack (%s)' % (track['format'], track['channels']),
+                             track['filename']]
+    mkvmerge_options += ['', '# Commentary tracks (may be empty)']
+    for track in commentaries:
+        mkvmerge_options += ['--default-track', '-1:0',
+                             '--track-name', '-1:%s commentary (%s)' % (track['format'], track['channels']),
+                             track['filename']]
+    mkvmerge_options += ['', '# Subtitles (may be empty)']
+    for track in subtitles:
+        mkvmerge_options += ['--default-track', '-1:0',
+                             '--track-name', '-1:Subtitles',
+                             track['filename']]
+    logger.info('Saving mkvmerge options to mkvmerge.options')
+    mkvopts_file = open('mkvmerge.options', 'w')
+    mkvopts_file.write('\n'.join(mkvmerge_options))
+    mkvopts_file.close()
+    return 0
     
 def main(argv=None):
     if argv is None:
