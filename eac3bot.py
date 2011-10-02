@@ -125,7 +125,7 @@ def demux(path, playlist_indexes=None):
                 if idx not in playlist_ids:
                     logger.error("There is no playlist %d, aborting." % idx)
                     return 1
-            demux_playlists = playlist_ids
+            demux_playlists = playlist_indexes
     else:
         #
         # Sort playlists by duration, choose the longest one.
