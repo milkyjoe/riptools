@@ -55,7 +55,9 @@ def chapter_tracks(track_list):
                               track_list)
 
 def video_tracks(track_list):
-    return find_track_matches(r'(?P<id>[0-9]+:) (?P<description>h264/AVC, 1080p24 /1.001 \(16:9\)$)', track_list)
+    all_tracks = find_track_matches(r'(?P<id>[0-9]+:) (?P<description>h264/AVC, 1080p24 /1.001 \(16:9\)$)', track_list)
+    all_tracks += find_track_matches(r'(?P<id>[0-9]+:) (?P<description>VC-1, 1080p24 /1.001 \(16:9\)$)', track_list)
+    return all_tracks
 
 def lossless_audio_tracks(track_list, languages=[r'English']):
     all_tracks = find_track_matches(r'(?P<id>[0-9]+:) (?P<description>DTS Master Audio, .*)',
