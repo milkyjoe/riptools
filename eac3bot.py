@@ -83,7 +83,7 @@ def chdir(dirname=None):
     finally:
         os.chdir(curdir)
     
-def demux(path, playlist_indexes=None):
+def demux(path, playlist_indexes=None, default_audio_track=None):
     #
     # Scan for playlists.
     #
@@ -182,9 +182,6 @@ def demux(path, playlist_indexes=None):
         if not lossless:
             logger.error("No lossless soundtracks selected, aborting.")
             return 1
-        if len(lossless) > 1:
-            logger.error("There's more than one lossless soundtrack, aborting.")
-            return 1
 
         # I always convert lossless tracks to FLAC.
         soundtracks = []
@@ -261,6 +258,15 @@ def demux(path, playlist_indexes=None):
         for track in subtitles:
             track['filename'] = '%02dsubtitles.sup' % idnum(track)
 
+        if default_audio_track is None:
+            # assume default audio track is the first soundtrack
+            default_audio_track = soundtracks[0]['id']
+        else:
+            if default_audio_track not in [track['id'].rstrip(':') for track in soundtracks] and \
+                    default_audio_track not in [track['id'].rstrip(':') for track in commentaries]:
+                logger.error("You selected track ID %s as the default audio track, but it's not an audio track; aborting." % default_audio_track)
+                return 1
+            
         eac3to_command = [eac3to, path, '%d)' % current_playlist]
         for lst in [chapters, videos, soundtracks, commentaries, subtitles]:
             for track in lst:
@@ -297,19 +303,33 @@ def demux(path, playlist_indexes=None):
         mkvmerge_options += ['', '# Additional video tracks (may be empty)']
         for track in videos[1:]:
             mkvmerge_options += ['--default-track', '-1:0', track['filename']]
-        # XXX hack - assume first soundtrack is the default
-        mkvmerge_options += ['', '# Default audio track']
-        mkvmerge_options += ['--default-track', '-1:1',
-                             '--track-name', '-1:%s theatrical soundtrack (%s)' % (soundtracks[0]['format'], soundtracks[0]['channels']),
-                             soundtracks[0]['filename']]
-        mkvmerge_options += ['', '# Additional audio tracks (may be empty)']
-        for track in soundtracks[1:]:
-            mkvmerge_options += ['--default-track', '-1:0',
+
+        mkvmerge_options += ['', '# Soundtracks']
+        for track in soundtracks:
+            if track['id'].rstrip(':') == default_audio_track:
+                dta = '-1:1'
+                # XXX hack: now reset default track so that if there's
+                # more than one track with the same id (e.g. a DTS-MA
+                # version of a FLAC track), we won't end up with two
+                # tracks marked as default.
+                default_audio_track = 0
+            else:
+                dta = '-1:0'
+            mkvmerge_options += ['--default-track', dta,
                                  '--track-name', '-1:%s theatrical soundtrack (%s)' % (track['format'], track['channels']),
                                  track['filename']]
         mkvmerge_options += ['', '# Commentary tracks (may be empty)']
         for track in commentaries:
-            mkvmerge_options += ['--default-track', '-1:0',
+            if track['id'].rstrip(':') == default_audio_track:
+                dta = '-1:1'
+                # XXX hack: now reset default track so that if there's
+                # more than one track with the same id (e.g. a DTS-MA
+                # version of a FLAC track), we won't end up with two
+                # tracks marked as default.
+                default_audio_track = 0
+            else:
+                dta = '-1:0'
+            mkvmerge_options += ['--default-track', dta,
                                  '--track-name', '-1:%s commentary (%s)' % (track['format'], track['channels']),
                                  track['filename']]
         mkvmerge_options += ['', '# Subtitles (may be empty)']
@@ -332,8 +352,11 @@ def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--playlist', nargs='+', default=None,
                         help='Demux the given playlists (by index), or all playlists if "all" is given.')
+    parser.add_argument('--default-audio-track', nargs=1, default=None,
+                        help='Make the given track number the default audio track (default: automatically selected).')
     parser.add_argument('path', nargs=1)
     args = parser.parse_args(argv)
+
     if args.playlist is None:
         playlist_indexes = None
     else:
@@ -345,12 +368,16 @@ def main(argv=None):
             except ValueError:
                 print >> sys.stderr, 'Playlist indexes must be an positive integer, or "all"'
                 return 1
-
+    if args.default_audio_track is None:
+        default_audio_track = None
+    else:
+        default_audio_track = args.default_audio_track[0]
+    
     logger.setLevel(logging.INFO)
     console = logging.StreamHandler()
     logger.addHandler(console)
     
-    return demux(args.path[0], playlist_indexes)
+    return demux(args.path[0], playlist_indexes, default_audio_track)
 
 if __name__ == '__main__':
     status = main()
