@@ -60,6 +60,8 @@ def video_tracks(track_list):
 def lossless_audio_tracks(track_list, languages=[r'English']):
     all_tracks = find_track_matches(r'(?P<id>[0-9]+:) (?P<description>DTS Master Audio, .*)',
                                     track_list)
+    all_tracks += find_track_matches(r'(?P<id>[0-9]+:) (?P<description>TrueHD/AC3, .*)',
+                                    track_list)
     return filter_by(languages, all_tracks)
 
 def lossy_audio_tracks(track_list, languages=[r'English'], channels=[r'[12]\.0']):
