@@ -62,7 +62,7 @@ def lossless_audio_tracks(track_list, languages=[r'English']):
                                     track_list)
     return filter_by(languages, all_tracks)
 
-def lossy_audio_tracks(track_list, languages=[r'English'], channels=[r'2.0']):
+def lossy_audio_tracks(track_list, languages=[r'English'], channels=[r'[12]\.0']):
     all_tracks = find_track_matches(r'(?P<id>[0-9]+:) (?P<description>AC3, .*)', track_list)
     all_tracks += find_track_matches(r'(?P<id>[0-9]+:) (?P<description>AC3 Surround, .*)', track_list)
     all_tracks += find_track_matches(r'(?P<id>[0-9]+:) (?P<description>DTS, .*)', track_list)
