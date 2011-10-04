@@ -64,6 +64,8 @@ def lossless_audio_tracks(track_list, languages=[r'English']):
                                     track_list)
     all_tracks += find_track_matches(r'(?P<id>[0-9]+:) (?P<description>TrueHD/AC3, .*)',
                                     track_list)
+    all_tracks += find_track_matches(r'(?P<id>[0-9]+:) (?P<description>RAW/PCM, .*)',
+                                     track_list)
     return filter_by(languages, all_tracks)
 
 def lossy_audio_tracks(track_list, languages=[r'English'], channels=[r'[12]\.0']):
@@ -193,7 +195,11 @@ def demux(path, playlist_indexes=None, default_audio_track=None):
         for track in lossless:
             soundtracks.append({'id' : track['id'],
                                 'description' : ' '.join([FLACTAG, track['description']])})
-            soundtracks.append(track)
+            # I don't want RAW/PCM tracks, just the FLAC will do.
+            if re.match(r'RAW/PCM', track['description']):
+                pass
+            else:
+                soundtracks.append(track)
 
         def log_tracks(track_type, tracks):
             logger.info("  %s:" % track_type)
