@@ -146,6 +146,7 @@ def demux(path, playlist_indexes=None, default_audio_track=None):
                              % zipped[0][0])
 
     for current_playlist in demux_playlists:
+        current_default_audio_track = default_audio_track
         demux_dir = "playlist_%02d" % current_playlist
         if not os.path.isdir(demux_dir):
             os.mkdir(demux_dir)
@@ -268,13 +269,13 @@ def demux(path, playlist_indexes=None, default_audio_track=None):
         for track in subtitles:
             track['filename'] = '%02dsubtitles.sup' % idnum(track)
 
-        if default_audio_track is None:
+        if current_default_audio_track is None:
             # assume default audio track is the first soundtrack
-            default_audio_track = soundtracks[0]['id']
+            current_default_audio_track = soundtracks[0]['id']
         else:
-            if default_audio_track not in [track['id'].rstrip(':') for track in soundtracks] and \
-                    default_audio_track not in [track['id'].rstrip(':') for track in commentaries]:
-                logger.error("You selected track ID %s as the default audio track, but it's not an audio track; aborting." % default_audio_track)
+            if current_default_audio_track not in [track['id'].rstrip(':') for track in soundtracks] and \
+                    current_default_audio_track not in [track['id'].rstrip(':') for track in commentaries]:
+                logger.error("You selected track ID %s as the default audio track, but it's not an audio track; aborting." % current_default_audio_track)
                 return 1
             
         eac3to_command = [eac3to, path, '%d)' % current_playlist]
@@ -316,13 +317,13 @@ def demux(path, playlist_indexes=None, default_audio_track=None):
 
         mkvmerge_options += ['', '# Soundtracks']
         for track in soundtracks:
-            if track['id'].rstrip(':') == default_audio_track:
+            if track['id'].rstrip(':') == current_default_audio_track:
                 dta = '-1:1'
                 # XXX hack: now reset default track so that if there's
                 # more than one track with the same id (e.g. a DTS-MA
                 # version of a FLAC track), we won't end up with two
                 # tracks marked as default.
-                default_audio_track = 0
+                current_default_audio_track = 0
             else:
                 dta = '-1:0'
             mkvmerge_options += ['--default-track', dta,
@@ -330,13 +331,13 @@ def demux(path, playlist_indexes=None, default_audio_track=None):
                                  track['filename']]
         mkvmerge_options += ['', '# Commentary tracks (may be empty)']
         for track in commentaries:
-            if track['id'].rstrip(':') == default_audio_track:
+            if track['id'].rstrip(':') == current_default_audio_track:
                 dta = '-1:1'
                 # XXX hack: now reset default track so that if there's
                 # more than one track with the same id (e.g. a DTS-MA
                 # version of a FLAC track), we won't end up with two
                 # tracks marked as default.
-                default_audio_track = 0
+                current_default_audio_track = 0
             else:
                 dta = '-1:0'
             mkvmerge_options += ['--default-track', dta,
