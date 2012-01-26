@@ -96,7 +96,7 @@ def test_run(binexec, args=[]):
     except:
         return False
 
-def demux(eac3to, mkvmerge, output_dir, path, name, playlist_indexes=None, default_audio_track=None):
+def demux(eac3to, mkvmerge, output_dir, cleanup, path, name, playlist_indexes=None, default_audio_track=None):
     if not test_run(eac3to):
         logger.error("Can't execute eac3to; use --eac3to to specify the path.")
         return 1
@@ -383,11 +383,23 @@ def demux(eac3to, mkvmerge, output_dir, path, name, playlist_indexes=None, defau
             rc = subprocess.call(mkvmerge_command)
             if rc:
                 return rc
+
+            if cleanup:
+                logger.info("Cleaning up demuxed tracks.")
+                for lst in [chapters, videos, soundtracks, commentaries, subtitles]:
+                    for track in lst:
+                        os.remove(track['filename'])
+                os.remove('%02dchapters - Log.txt' % idnum(chapters[0]))
+                os.remove('mkvmerge.options')
+
         os.chdir("..")
-        
+        if cleanup and not os.listdir(demux_dir):
+            logger.info("Removing empty demux directory %s" % demux_dir)
+            os.rmdir(demux_dir)
+
     logger.info('Done')
     return 0
-    
+
 def main(argv=None):
     if argv is None:
         argv = sys.argv[1:]
@@ -404,6 +416,8 @@ def main(argv=None):
                         help='Path to mkvmerge.')
     parser.add_argument('--output-dir', nargs=1, default=None,
                         help='Write mkv file to this directory (default: same as playlist dir). Note that if the mkvmerge step is disabled, or if multiple playlists are to be demuxed, this flag is ignored.')
+    parser.add_argument('--cleanup', action='store_true', default=None,
+                        help='Clean up demuxed tracks after mkvmerge (default: False). Ignored if mkvmerge step is disabled.')
     parser.add_argument('--eac3to', nargs=1, default=None,
                         help='Path to eac3to.')
     parser.add_argument('path', nargs=1)
@@ -432,7 +446,8 @@ def main(argv=None):
         conffile = args.config
     config_defaults = {'mkvmerge': 'mkvmerge',
                        'eac3to': 'eac3to',
-                       'output-dir': 'None'
+                       'output-dir': 'None',
+                       'cleanup': 'False'
                        }
     config = ConfigParser.SafeConfigParser(config_defaults)
     config.read(conffile)
@@ -485,9 +500,19 @@ def main(argv=None):
     elif output_dir:
         logger.info("Writing MKV file to %s" % output_dir)
 
+    # Only clean up if mkvmerge is enabled.
+    if mkvmerge:
+        if args.cleanup is None:
+            cleanup = config.get('DEFAULT', 'cleanup')
+        else:
+            cleanup = args.cleanup
+    else:
+        cleanup = False
+
+
     logger.info('')
 
-    return demux(eac3to, mkvmerge, output_dir, args.path[0], args.name[0], playlist_indexes, default_audio_track)
+    return demux(eac3to, mkvmerge, output_dir, cleanup, args.path[0], args.name[0], playlist_indexes, default_audio_track)
 
 if __name__ == '__main__':
     status = main()
