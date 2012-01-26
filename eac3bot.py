@@ -31,6 +31,7 @@ import os
 import contextlib
 
 eac3to = 'C:\Program Files (x86)\eac3to\eac3to.exe'
+mkvmerge = 'mkvmerge'
 
 logger = logging.getLogger('eac3bot')
 
@@ -89,7 +90,7 @@ def chdir(dirname=None):
     finally:
         os.chdir(curdir)
     
-def demux(path, playlist_indexes=None, default_audio_track=None):
+def demux(path, name, playlist_indexes=None, default_audio_track=None):
     #
     # Scan for playlists.
     #
@@ -147,7 +148,7 @@ def demux(path, playlist_indexes=None, default_audio_track=None):
 
     for current_playlist in demux_playlists:
         current_default_audio_track = default_audio_track
-        demux_dir = "playlist_%02d" % current_playlist
+        demux_dir = "%s.playlist_%02d" % (name, current_playlist)
         if not os.path.isdir(demux_dir):
             os.mkdir(demux_dir)
         os.chdir(demux_dir)
@@ -352,6 +353,15 @@ def demux(path, playlist_indexes=None, default_audio_track=None):
         mkvopts_file = open('mkvmerge.options', 'w')
         mkvopts_file.write('\n'.join(mkvmerge_options))
         mkvopts_file.close()
+
+        # Make the mkv.
+        logger.info('')
+        logger.info("Running mkvmerge")
+        mkvmerge_command = [mkvmerge, "-o", "%s.mkv" % name, "@mkvmerge.options"]
+        logger.info("mkvmerge command line: %s", ' '.join(mkvmerge_command))
+        rc = subprocess.call(mkvmerge_command)
+        if rc:
+            return rc
         os.chdir("..")
         
     logger.info('Done')
@@ -366,6 +376,7 @@ def main(argv=None):
     parser.add_argument('--default-audio-track', nargs=1, default=None,
                         help='Make the given track number the default audio track (default: automatically selected).')
     parser.add_argument('path', nargs=1)
+    parser.add_argument('name', nargs=1)
     args = parser.parse_args(argv)
 
     if args.playlist is None:
@@ -388,7 +399,7 @@ def main(argv=None):
     console = logging.StreamHandler()
     logger.addHandler(console)
     
-    return demux(args.path[0], playlist_indexes, default_audio_track)
+    return demux(args.path[0], args.name[0], playlist_indexes, default_audio_track)
 
 if __name__ == '__main__':
     status = main()
