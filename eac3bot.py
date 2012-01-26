@@ -27,11 +27,9 @@ import argparse
 import subprocess
 import re
 import logging
-import os
+import os, os.path
 import contextlib
-
-eac3to = 'C:\Program Files (x86)\eac3to\eac3to.exe'
-mkvmerge = 'mkvmerge'
+import ConfigParser
 
 logger = logging.getLogger('eac3bot')
 
@@ -89,8 +87,23 @@ def chdir(dirname=None):
         yield
     finally:
         os.chdir(curdir)
+
+def test_run(binexec, args=[]):
+    try:
+        _ = subprocess.check_output([binexec] + args,
+                                    stderr=subprocess.STDOUT)
+        return True
+    except:
+        return False
+
+def demux(eac3to, mkvmerge, path, name, playlist_indexes=None, default_audio_track=None):
+    if not test_run(eac3to):
+        logger.error("Can't execute eac3to; use --eac3to to specify the path.")
+        return 1
+    if mkvmerge and not test_run(mkvmerge, ["-V"]):
+        logger.error("Can't execute mkvmerge; use --mkvmerge to specify the path.")
+        return 1
     
-def demux(path, name, playlist_indexes=None, default_audio_track=None):
     #
     # Scan for playlists.
     #
@@ -354,14 +367,15 @@ def demux(path, name, playlist_indexes=None, default_audio_track=None):
         mkvopts_file.write('\n'.join(mkvmerge_options))
         mkvopts_file.close()
 
-        # Make the mkv.
-        logger.info('')
-        logger.info("Running mkvmerge")
-        mkvmerge_command = [mkvmerge, "-o", "%s.mkv" % name, "@mkvmerge.options"]
-        logger.info("mkvmerge command line: %s", ' '.join(mkvmerge_command))
-        rc = subprocess.call(mkvmerge_command)
-        if rc:
-            return rc
+        if mkvmerge:
+            # Make the mkv.
+            logger.info('')
+            logger.info("Running mkvmerge")
+            mkvmerge_command = [mkvmerge, "-o", "%s.mkv" % name, "@mkvmerge.options"]
+            logger.info("mkvmerge command line: %s", ' '.join(mkvmerge_command))
+            rc = subprocess.call(mkvmerge_command)
+            if rc:
+                return rc
         os.chdir("..")
         
     logger.info('Done')
@@ -371,10 +385,18 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv[1:]
     parser = argparse.ArgumentParser()
+    parser.add_argument('--config', nargs=1, default=None,
+                        help='Use specified config file (default: look for .eac3bot in current working dir, then ~/.eac3bot if not found).')
     parser.add_argument('--playlist', nargs='+', default=None,
                         help='Demux the given playlists (by index), or all playlists if "all" is given.')
     parser.add_argument('--default-audio-track', nargs=1, default=None,
                         help='Make the given track number the default audio track (default: automatically selected).')
+    parser.add_argument('--skip-mkvmerge', action='store_true', default=False,
+                        help='Skip mkvmerge step after demux.')
+    parser.add_argument('--mkvmerge', nargs=1, default=None,
+                        help='Path to mkvmerge.')
+    parser.add_argument('--eac3to', nargs=1, default=None,
+                        help='Path to eac3to.')
     parser.add_argument('path', nargs=1)
     parser.add_argument('name', nargs=1)
     args = parser.parse_args(argv)
@@ -394,12 +416,48 @@ def main(argv=None):
         default_audio_track = None
     else:
         default_audio_track = args.default_audio_track[0]
+
+    if args.config is None:
+        conffile = ['.eac3bot', os.path.expanduser('~/.eac3bot')]
+    else:
+        conffile = args.config
+    config_defaults = {'mkvmerge': 'mkvmerge',
+                       'eac3to': 'eac3to'
+                       }
+    config = ConfigParser.SafeConfigParser(config_defaults)
+    config.read(conffile)
     
     logger.setLevel(logging.INFO)
     console = logging.StreamHandler()
     logger.addHandler(console)
+
+    # Merge config and command line. The latter takes precedence.
+    #
+    # Also, let's be nice to the user and strip quotes off paths in
+    # the config file (they won't work with quotes on them).
+    def stripquotes(path):
+        return path.rstrip('\'"').lstrip('\'"')
+
+    if args.eac3to:
+        eac3to = args.eac3to[0]
+    else:
+        eac3to = stripquotes(config.get('DEFAULT', 'eac3to'))
+    if args.mkvmerge:
+        mkvmerge = args.mkvmerge[0]
+    else:
+        mkvmerge = stripquotes(config.get('DEFAULT', 'mkvmerge'))
+
+    if args.skip_mkvmerge:
+        mkvmerge = None
+
+    logger.info('Using eac3to executable: %s' % eac3to)
+    if mkvmerge:
+        logger.info('Using mkvmerge executable: %s' % mkvmerge)
+    else:
+        logger.info('Skipping mkvmerge step')
+    logger.info('')
     
-    return demux(args.path[0], args.name[0], playlist_indexes, default_audio_track)
+    return demux(eac3to, mkvmerge, args.path[0], args.name[0], playlist_indexes, default_audio_track)
 
 if __name__ == '__main__':
     status = main()
