@@ -379,7 +379,7 @@ def demux(eac3to, mkvmerge, output_dir, cleanup, path, name, playlist_indexes=No
                     os.makedirs(outpath)
                 outfile = os.path.join(outpath, '%s.mkv' % name)
             else:
-                outfile = name
+                outfile = name + '.mkv'
             mkvmerge_command = [mkvmerge, "-o", outfile, "@mkvmerge.options"]
             logger.info("mkvmerge command line: %s", ' '.join(mkvmerge_command))
             rc = subprocess.call(mkvmerge_command)
