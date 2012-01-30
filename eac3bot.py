@@ -247,10 +247,10 @@ def demux(eac3to, mkvmerge, output_dir, cleanup, path, name, playlist_indexes=No
         for track in soundtracks:
             # XXX handle these more gracefully.
             if re.search(r'strange setup', track['description']):
-                logger.error("Track %d is a 'strange setup', aborting." % track['id'])
+                logger.error("Track %s is a 'strange setup', aborting." % track['id'])
                 return 1
             elif re.search(r'6.1 channels', track['description']):
-                logger.error("Track %d is a 6.1-channel track, aborting." % track['id'])
+                logger.error("Track %s is a 6.1-channel track, aborting." % track['id'])
                 return 1
 
             if re.match(r'\(FLAC\)', track['description']):
