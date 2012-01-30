@@ -239,6 +239,11 @@ def demux(eac3to, mkvmerge, output_dir, cleanup, path, name, playlist_indexes=No
         #
         def idnum(track):
             return int(track['id'].rstrip(':'))
+        def add_option(track, option):
+            if 'eac3to args' in track:
+                track['eac3to args'] += [option]
+            else:
+                track['eac3to args'] = [option]
 
         for track in chapters:
             track['filename'] = '%02dchapters.txt' % idnum(track)
@@ -249,13 +254,13 @@ def demux(eac3to, mkvmerge, output_dir, cleanup, path, name, playlist_indexes=No
             if re.search(r'strange setup', track['description']):
                 logger.error("Track %s is a 'strange setup', aborting." % track['id'])
                 return 1
-            elif re.search(r'6.1 channels', track['description']):
-                logger.error("Track %s is a 6.1-channel track, aborting." % track['id'])
-                return 1
 
             if re.match(r'\(FLAC\)', track['description']):
                 track['filename'] = '%02daudio.flac' % idnum(track)
                 track['format'] = 'FLAC'
+                if re.search(r'DTS Master Audio', track['description']) and re.search(r'6.1 channels', track['description']):
+                    logger.warning("Track %s is a DTS-MA 6.1 track, using Sonic decoder for it." % track['id'])
+                    add_option(track, '-sonic')
             elif re.match(r'DTS Master Audio', track['description']):
                 track['filename'] = '%02daudio.dts' % idnum(track)
                 track['format'] = 'DTS-MA'
@@ -281,7 +286,7 @@ def demux(eac3to, mkvmerge, output_dir, cleanup, path, name, playlist_indexes=No
             track['channels'] = re.search(r'(?P<channels>[1-7]\.[0-2] channels)', track['description']).group('channels')
             # Keep dialog normalization for commentaries.
             if re.search(r'dialnorm', track['description']):
-                track['eac3to args'] = ['-keepDialnorm']
+                add_option(track, '-keepDialnorm')
         for track in subtitles:
             track['filename'] = '%02dsubtitles.sup' % idnum(track)
 
