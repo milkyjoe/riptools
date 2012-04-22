@@ -98,7 +98,7 @@ def test_run(binexec, args=[]):
     except:
         return False
 
-def demux(eac3to, mkvmerge, output_dir, cleanup, path, name, playlist_indexes=None, default_audio_track=None):
+def demux(eac3to, mkvmerge, output_dir, cleanup, path, name, playlist_indexes=None, soundtrack_languages=['English'], default_audio_track=None):
     if not test_run(eac3to):
         logger.error("Can't execute eac3to; use --eac3to to specify the path.")
         return 1
@@ -185,7 +185,7 @@ def demux(eac3to, mkvmerge, output_dir, cleanup, path, name, playlist_indexes=No
                       pl_output.split('\r\n')]
         chapters = chapter_tracks(tracks)
         videos = video_tracks(tracks)
-        lossless = lossless_audio_tracks(tracks)
+        lossless = lossless_audio_tracks(tracks, soundtrack_languages)
         commentaries = lossy_audio_tracks(tracks)
         subtitles = subtitle_tracks(tracks)
 
@@ -417,6 +417,8 @@ def main(argv=None):
                         help='Demux the given playlists (by index), or all playlists if "all" is given.')
     parser.add_argument('--default-audio-track', nargs=1, default=None,
                         help='Make the given track number the default audio track (default: automatically selected).')
+    parser.add_argument('--soundtrack-languages', nargs='+', default=['English'],
+                        help='Specify the soundtrack language(s) to use (default: only English).')
     parser.add_argument('--skip-mkvmerge', action='store_true', default=False,
                         help='Skip mkvmerge step after demux.')
     parser.add_argument('--mkvmerge', nargs=1, default=None,
@@ -519,7 +521,7 @@ def main(argv=None):
 
     logger.info('')
 
-    return demux(eac3to, mkvmerge, output_dir, cleanup, args.path[0], args.name[0], playlist_indexes, default_audio_track)
+    return demux(eac3to, mkvmerge, output_dir, cleanup, args.path[0], args.name[0], playlist_indexes, args.soundtrack_languages, default_audio_track)
 
 if __name__ == '__main__':
     status = main()
